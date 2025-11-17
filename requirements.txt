@@ -1,0 +1,9 @@
+google-cloud-aiplatform[agent_engines,adk]
+vertexai
+google-cloud-storage
+pydantic
+python-dotenv
+google-genai
+uvicorn
+fastapi
+google-cloud-tasks
