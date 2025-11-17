@@ -14,6 +14,14 @@ The application is triggered by a file upload to a GCS bucket. The event is proc
 - **`requirements.txt`**: Lists the Python dependencies for the project.
 - **`.env`**: Contains the environment variables for configuring the application and its connection to Google Cloud services.
 
+## Configuration
+
+Before running the application, you need to update the `.env` file with your own environment variables. This file is crucial for configuring the application and its connection to Google Cloud services.
+
+Make sure to replace the placeholder values in `.env` with your actual project-specific information. This includes details such as your Google Cloud project ID, BigQuery dataset, and GCS bucket names.
+
+**Important:** The `.env` file contains sensitive information. Ensure that it is included in your `.gitignore` file to prevent it from being committed to version control.
+
 ## Workflow
 
 1.  A file is uploaded to a GCS bucket.
