@@ -31,7 +31,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from google.adk.runners import Runner
 from google.adk.plugins.logging_plugin import LoggingPlugin
 from google.adk.sessions import Session, InMemorySessionService
-from google.adk.artifacts import InMemoryArtifactService
+from google.adk.artifacts import GcsArtifactService
 from pydantic import BaseModel
 from google.genai.types import Content, Part
 from google.cloud import tasks_v2
@@ -48,6 +48,8 @@ LOCATION_ID = os.environ.get("GOOGLE_CLOUD_LOCATION")
 QUEUE_ID = os.environ.get("GOOGLE_CLOUD_TASK_QUEUE_ID")
 SERVICE_URL = os.environ.get("GOOGLE_CLOUD_RUN_URL")
 SERVICE_EMAIL = os.environ.get("GOOGLE_CLOUD_SERVICE_ACCOUNT_EMAIL")
+ARTIFACTS_BUCKET = os.environ.get("ARTIFACTS_BUCKET")
+#
 
 logging_plugin = LoggingPlugin()
 
@@ -94,7 +96,8 @@ app.add_middleware(
 # Use an in-memory session service for simplicity
 session_service = InMemorySessionService()
 # Use an in-memory artifact service
-artifact_service = InMemoryArtifactService()
+#artifact_service = InMemoryArtifactService()
+artifact_service = GcsArtifactService(bucket_name=ARTIFACTS_BUCKET)
 # Initialize the ADK Runner with the root agent and session service
 runner = Runner(
     app_name="video_analysis_agent",

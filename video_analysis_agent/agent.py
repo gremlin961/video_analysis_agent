@@ -178,8 +178,8 @@ async def list_artifacts(tool_context: ToolContext) -> str:
     except Exception as e:
         logging.error(f"An unexpected error occurred during Python artifact list: {e}")
         return "Error: An unexpected error occurred while listing Python artifacts."
-    
 
+    
 
 # Define a tool configuration to block any write operations
 tool_config = BigQueryToolConfig(write_mode=WriteMode.ALLOWED)
@@ -355,6 +355,7 @@ root_agent = Agent(
         8. Pass this information along with the exact text you received from the `reasoning_agent` to the `bq_agent` to be added to the BigQuery `assets` table.
             - Note that you will write the description exactly as it was provided to you from the `reasoning_agent`
         9. Respond with the message: "Asset <name> has been successfully processed and added to the asset table."
+        10. Use the `delete_artifacts` tool to delete all artifacts from the session.
     """,
     tools=[
         AgentTool(agent=reasoning_agent), # Make the reasoning_agent available as a tool

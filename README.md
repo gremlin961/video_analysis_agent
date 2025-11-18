@@ -14,14 +14,6 @@ The application is triggered by a file upload to a GCS bucket. The event is proc
 - **`requirements.txt`**: Lists the Python dependencies for the project.
 - **`.env`**: Contains the environment variables for configuring the application and its connection to Google Cloud services.
 
-## Configuration
-
-Before running the application, you need to update the `.env` file with your own environment variables. This file is crucial for configuring the application and its connection to Google Cloud services.
-
-Make sure to replace the placeholder values in `.env` with your actual project-specific information. This includes details such as your Google Cloud project ID, BigQuery dataset, and GCS bucket names.
-
-**Important:** The `.env` file contains sensitive information. Ensure that it is included in your `.gitignore` file to prevent it from being committed to version control.
-
 ## Workflow
 
 1.  A file is uploaded to a GCS bucket.
@@ -32,6 +24,13 @@ Make sure to replace the placeholder values in `.env` with your actual project-s
 6.  The `root_agent` uses the `add_artifact_from_gcs` tool to make the file available to the agent.
 7.  The `reasoning_agent` analyzes the video and generates a summary.
 8.  The `bq_agent` ingests the summary and other metadata into a BigQuery table.
+
+## Artifact Management
+
+The agent uses the `GcsArtifactService` to manage temporary files (artifacts) created during the analysis process. These artifacts are stored in a Google Cloud Storage bucket specified by the `ARTIFACTS_BUCKET` environment variable in the `.env` file.
+
+> [!IMPORTANT]
+> It is highly recommended to configure a lifecycle policy on the GCS bucket used for artifacts. Since these artifacts are only needed during the processing of a single video, a policy should be set to automatically delete objects after a short period (e.g., 1 day) to prevent unnecessary storage costs.
 
 ## Testing and Development
 
