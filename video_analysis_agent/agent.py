@@ -26,7 +26,7 @@ import vertexai
 from vertexai.preview.generative_models import GenerativeModel, Part 
 
 # Vertex Agent Modules
-from google.adk.agents import Agent # Base class for creating agents
+from google.adk.agents.llm_agent import Agent # Base class for creating agents
 from google.adk.tools.agent_tool import AgentTool # Wrapper to use one agent as a tool for another
 from google.adk.tools import ToolContext
 from google.adk.tools import load_artifacts, load_memory
@@ -206,6 +206,7 @@ bigquery_toolset = BigQueryToolset(
 # This agent is responsible for interacting with BigQuery.
 # Its primary function is to take the analysis results from the reasoning_agent
 # and insert them into the specified BigQuery table.
+# It uses the 'gemini-2.5-pro' model which is optimized for complex reasoning and tool use.
 bq_agent = Agent(
     model="gemini-2.5-pro", # Advanced model for complex tasks and reasoning
     name="bq_agent",
@@ -228,6 +229,7 @@ bq_agent = Agent(
             - Note that you will only add the asset_id, gcs_uri,and description columns to the table
             - Note that you will write the description exactly as provided to you
         4: Execute the SQL query using the bigquery_toolset tool
+        5. Respond with the message: "Asset <name> has been successfully processed and added to the asset table."
 
         
     """,
@@ -244,8 +246,9 @@ bq_agent = Agent(
 # This agent is the core analysis engine of the workflow.
 # It uses a powerful generative model to analyze the content of a digital asset (image or video)
 # and generate a detailed, ADA-compliant description.
+# It is instructed to be an expert AI assistant specializing in video accessibility.
 reasoning_agent = Agent(
-    model="gemini-2.5-pro", # Advanced model for complex tasks and reasoning
+    model="gemini-3-pro-preview", # Advanced model for complex tasks and reasoning
     name="reasoning_agent",
     instruction=
     """
@@ -294,10 +297,16 @@ reasoning_agent = Agent(
         Use Present Tense: Describe the visuals as they happen (e.g., "The model is zipping up the jacket," not "The model zipped up the jacket.").
         Use Simple, Clear Language: Avoid jargon or overly technical terms unless they are part of the product's name or specifications shown on screen.
         Technical and Accessibility Standards
-        Synchronization: Your generated description must correspond to the visual events occurring at that moment in the video. Include durations for each description using the following format: [mm:ss - mm:ss] Description.
+        Synchronization: Your generated description must correspond to the visual events occurring at that moment in the video. 
+        Include durations for each description using the following format: [mm:ss - mm:ss] Description. You MUST follow this format in your response.
 
-        The content you generate is part of an automated process to analyze content to comply with ADA and WCAG standards. Construct your response accordingly.
+        The content you generate is part of an automated process to analyze content to comply with ADA and WCAG standards. DO NOT add any tiltes, headings, additional text or formatting to the output.
+        An example of a valid response is:
+        [00:00 - 00:05] A person is standing in front of a table.
+        [00:05 - 00:10] A person is sitting at a desk.
+        [00:10 - 00:15] A person is standing in front of a table.
 
+        pass your response to the root_agent to be added to the BigQuery table.
     """,
     description="Performs reasearch related to a provided question or topic.",
     tools=[
@@ -321,9 +330,9 @@ runner_root = None # Initialize runner variable (although runner is created late
 # This is the main orchestrator of the agentic workflow.
 # It receives the initial trigger from the FastAPI server, coordinates the execution
 # of the other agents and tools, and ensures the successful processing of the asset.
+# It delegates specific tasks to 'reasoning_agent' and 'bq_agent'.
 root_agent = Agent(
     name="root_agent",    # Name for the root agent
-    #model="gemini-2.5-flash", # Model for the root agent (orchestration)
     model="gemini-2.5-flash", # Model that supports Audio input and output 
     description="The main coordinator agent. Handles user requests and delegates tasks to specialist sub-agents and tools.", # Description (useful if this agent were itself a sub-agent)
     instruction=                  # The core instructions defining the workflow
@@ -339,27 +348,15 @@ root_agent = Agent(
         2. Parse this data to extract the "bucket" and "name" of the file.
         3. Construct the full GCS URI in the format "gs://<bucket>/<name>".
         4. Use the `add_artifact_from_gcs` tool with the constructed GCS URI to add the file as an artifact to the session.
-        5. Review the video and determine the following information. Your output will be in JSON format. Only use these approved key value pairs.
-            - asset_category:
-                - product_overview
-                - assmbly_instructions
-        6. Pass the asset_category result and gcs_uri to the `reasoning_agent` AgentTool to analyze the file. This will return a summary and detials from the asset analysis.
-        7. Parse the original data you recevied and identify the following information:
-            - File Name
-            - Bucket Name
-            - Content Type
-            - File Size
-            - Time Created
-            - GCS URI (for example, gs://rkiles-dam/ad 1 scene 1.mp4)
-            - Authenticated URL (for example, https://storage.cloud.google.com/rkiles-dam/ad%201%20scene%201.mp4. Notice the URL encoding of the file name when spaces are present.)
-        8. Pass this information along with the exact text you received from the `reasoning_agent` to the `bq_agent` to be added to the BigQuery `assets` table.
-            - Note that you will write the description exactly as it was provided to you from the `reasoning_agent`
-        9. Respond with the message: "Asset <name> has been successfully processed and added to the asset table."
-        10. Use the `delete_artifacts` tool to delete all artifacts from the session.
+        5. Pass the gcs_uri to the `reasoning_agent` AgentTool to analyze the file. 
+        6. Pass the reasoning_agent output to the `bq_agent` sub-agent 
+
     """,
+    sub_agents=[
+        bq_agent,
+        ],
     tools=[
         AgentTool(agent=reasoning_agent), # Make the reasoning_agent available as a tool
-        AgentTool(agent=bq_agent), # Make the bq_agent available as a tool
         add_artifact_from_gcs,
         list_artifacts,
         load_artifacts,
@@ -367,14 +364,12 @@ root_agent = Agent(
     ],
 )
 
-# Assign the created agent to the root_agent variable for clarity in the next step
-#root_agent = search_agent_team
-
 
 # --- Main Execution Block ---
 # This block of code is executed when the script is run directly.
 # It initializes the Vertex AI SDK and creates a remote agent engine,
 # which makes the root_agent and its entire workflow accessible as a deployable service.
+# This is how the agent is registered with Vertex AI Agent Engine.
 if __name__ == '__main__':
     vertexai.init(
         project=GOOGLE_CLOUD_PROJECT,

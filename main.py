@@ -37,14 +37,16 @@ from google.genai.types import Content, Part
 from google.cloud import tasks_v2
 from dotenv import load_dotenv
 import video_analysis_agent.agent as video_analysis_agent
+# Standard library imports
 import uuid
 
 # Load environment variables from .env file
+# This is crucial for local development to simulate the cloud environment.
 load_dotenv(dotenv_path="video_analysis_agent/.env")
 
 # --- Configuration ---
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
-LOCATION_ID = os.environ.get("GOOGLE_CLOUD_LOCATION")
+LOCATION_ID = os.environ.get("GOOGLE_CLOUD_REGION")
 QUEUE_ID = os.environ.get("GOOGLE_CLOUD_TASK_QUEUE_ID")
 SERVICE_URL = os.environ.get("GOOGLE_CLOUD_RUN_URL")
 SERVICE_EMAIL = os.environ.get("GOOGLE_CLOUD_SERVICE_ACCOUNT_EMAIL")
@@ -60,6 +62,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 tasks_client = tasks_v2.CloudTasksClient()
 
 # Define the Pydantic model for the GCS event
+# This model validates the incoming JSON payload from the GCS event trigger.
 class GcsEvent(BaseModel):
     bucket: str
     name: str
@@ -95,9 +98,12 @@ app.add_middleware(
 # production scenarios, you would use persistent storage like a database.
 # Use an in-memory session service for simplicity
 session_service = InMemorySessionService()
+
 # Use an in-memory artifact service
 #artifact_service = InMemoryArtifactService()
+# Use a GCS artifact service
 artifact_service = GcsArtifactService(bucket_name=ARTIFACTS_BUCKET)
+
 # Initialize the ADK Runner with the root agent and session service
 runner = Runner(
     app_name="video_analysis_agent",
@@ -106,6 +112,12 @@ runner = Runner(
     session_service=session_service,
     artifact_service=artifact_service,
 )
+
+# The Runner is responsible for:
+# 1. Managing the conversation history (Session).
+# 2. Routing messages to the appropriate agent.
+# 3. Executing tool calls.
+# 4. Handling artifact storage/retrieval.
 
 # --- API Endpoints ---
 @app.get("/")
@@ -213,6 +225,7 @@ async def process_asset(event: GcsEvent):
         logging.error(f"Error in agent workflow: {e}")
         # Return a 500 error to signal to Cloud Tasks that the task failed and should be retried.
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # --- Main Execution ---
 # This block of code starts the Uvicorn server when the script is executed directly.
